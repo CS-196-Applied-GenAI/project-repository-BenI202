@@ -1,10 +1,12 @@
-# Simplified Twitter/X Backend Specification
+# Chirper Backend Specification
 
 ## 1. Project Overview
 
-This project is a backend-only, class-sized implementation of a simplified Twitter/X-style application. The backend will be built as a JSON REST API using Node.js, Express, MySQL/MariaDB, and server-side sessions with an HTTP-only session cookie.
+This project is a backend-only, class-sized implementation of a simplified Twitter/X-style application called Chirper. The backend will be built as a JSON REST API using Node.js, Express, MySQL/MariaDB, and server-side sessions with an HTTP-only session cookie.
 
 The goal is not to recreate the full modern Twitter/X product. The goal is to implement a smaller, well-scoped social posting backend with clear requirements, persistent relational data, test coverage, and straightforward architecture.
+
+This specification follows the provided database schema. Where product decisions and schema details could have conflicted, the schema has priority.
 
 ## 2. Core Scope
 
@@ -14,40 +16,43 @@ The backend must support the following required functionality:
 2. Log in
 3. Log out
 4. Update profile
-5. Create a post
-6. Delete a post
-7. View a feed of recent posts
+5. Create a tweet
+6. Delete a tweet
+7. View a feed of recent tweets
 8. Refresh the feed by calling the feed endpoint again
 9. Follow a user
 10. Unfollow a user
 11. Block a user
 12. Unblock a user
-13. Like a post
-14. Unlike a post
-15. Reply to a post
-16. Retweet a post
-17. Unretweet a post
-18. View user profiles and a user's post history
+13. Like a tweet
+14. Unlike a tweet
+15. Comment on a tweet
+16. Retweet a tweet
+17. Unretweet a tweet
+18. View user profiles and a user's tweet history
 
 ## 3. Explicit Assumptions
 
-- All content and account functionality requires authentication.
-- Users should not be able to view feed data, profiles, or post content unless logged in.
+- All core application functionality requires authentication except signup, login, and health-check endpoints.
+- Users should not be able to view feed data, profiles, or tweet content unless logged in.
 - The API returns JSON only. No server-rendered pages are required.
-- Username must be unique.
-- Username will be treated as immutable after account creation, even though the assignment text mentions username updates.
-- Passwords must be securely hashed.
 - Server-side sessions with an HTTP-only session cookie will be used instead of JWT.
-- The relational database will be MySQL or MariaDB, using the provided course schema where applicable.
-- Posts are ordered reverse-chronologically.
-- Feed and post-list endpoints use `limit` and `offset` pagination.
+- The relational database will be MySQL or MariaDB, using the provided Chirper schema.
+- Tweets are ordered reverse-chronologically.
+- Feed and tweet-list endpoints use `limit` and `offset` pagination.
 - Default feed size is `20`.
 - Maximum allowed `limit` is `50`.
-- Posts have a maximum length of `280` characters.
-- Post editing is out of scope.
-- Retweets are simple reposts of an existing post with no added commentary.
-- Replies are stored in the same posts table using a parent-post reference.
+- Tweets have a maximum length of `240` characters because the schema uses `VARCHAR(240)` for `tweets.text`.
+- Comments have a maximum length of `240` characters because the schema uses `VARCHAR(240)` for `comments.contents`.
+- Tweet editing is out of scope.
+- Username must be unique and immutable after account creation.
+- Email must be unique.
+- Profile updates will support `name`, `bio`, and `profile_picture`.
+- Retweets are simple reposts of an existing tweet with no added commentary.
+- Retweets are represented as rows in the `tweets` table using `retweeted_from`.
+- Comments are stored in the `comments` table, not the `tweets` table.
 - Real-time updates, websockets, and polling infrastructure are out of scope.
+- The `blacklisted_tokens` table exists in the schema but will not be used in the session-based MVP.
 
 ## 4. Technology Requirements
 
@@ -59,113 +64,127 @@ The backend must support the following required functionality:
 - Testing: Jest + Supertest
 - Test database: separate database instance/schema from development
 
-## 5. High-Level Data Model
+## 5. Database-Aligned Data Model
 
-The implementation should stay close to the provided relational schema, but the backend logic should support at least the following conceptual entities.
+The implementation should follow the provided schema directly.
 
-### 5.1 Users
+### 5.1 `users`
 
 Represents application accounts.
 
-Suggested fields:
+Fields:
 
 - `id`
-- `username` (unique, required)
-- `password_hash` (required)
-- `display_name` (required or defaulted from username)
-- `bio` (nullable)
-- `profile_image_url` (nullable)
+- `username` (`VARCHAR(50)`, unique, required)
+- `password_hash` (`TEXT`, required)
 - `created_at`
-- `updated_at`
+- `email` (`VARCHAR(255)`, unique, required)
+- `bio` (`TEXT`, nullable)
+- `profile_picture` (`VARCHAR(255)`, nullable)
+- `name` (`VARCHAR(100)`, nullable)
 
-### 5.2 Posts
+Business rules:
 
-Represents original posts and replies.
+- username must be unique
+- email must be unique
+- username is not editable in this project version
+- password is stored only as a secure hash
 
-Suggested fields:
+### 5.2 `tweets`
+
+Represents original tweets and retweets.
+
+Fields:
 
 - `id`
-- `author_id`
-- `content`
-- `parent_post_id` (nullable, used for replies)
+- `user_id`
+- `text` (`VARCHAR(240)`, nullable in schema)
+- `image_url` (`VARCHAR(255)`, nullable)
+- `created_at`
+- `retweeted_from` (nullable foreign key to `tweets.id`)
+
+Business rules:
+
+- original tweets must include non-empty `text`
+- `text.length <= 240`
+- simple retweets create a new row with `retweeted_from` pointing to the original tweet
+- retweets do not include added commentary in this project version
+
+### 5.3 `comments`
+
+Represents comments on tweets.
+
+Fields:
+
+- `id`
+- `user_id`
+- `tweet_id`
+- `contents` (`VARCHAR(240)`)
 - `created_at`
 
-Rules:
+Business rules:
 
-- `content` is required
-- `content.length <= 280`
-- Original posts have `parent_post_id = NULL`
-- Replies reference another post in `parent_post_id`
+- comments belong to a tweet
+- `contents` is required
+- `contents.length <= 240`
 
-### 5.3 Follows
+### 5.4 `likes`
+
+Represents a user's like on a tweet.
+
+Fields:
+
+- `tweet_id`
+- `user_id`
+- `created_at`
+
+Business rules:
+
+- a user can like a given tweet at most once
+
+### 5.5 `follows`
 
 Represents follower relationships.
 
-Suggested fields:
+Fields:
 
 - `follower_id`
-- `followed_id`
+- `followee_id`
 - `created_at`
 
-Rules:
+Business rules:
 
-- A user cannot follow themself
-- Duplicate follow rows should not be allowed
+- a user cannot follow themself
+- duplicate follows are not allowed
 
-### 5.4 Blocks
+### 5.6 `blocks`
 
 Represents user blocking relationships.
 
-Suggested fields:
+Fields:
 
 - `blocker_id`
 - `blocked_id`
 - `created_at`
 
-Rules:
+Business rules:
 
-- A user cannot block themself
-- Duplicate block rows should not be allowed
-- Creating a block automatically removes any follow relationship in either direction
+- a user cannot block themself
+- duplicate blocks are not allowed
+- creating a block automatically removes follow relationships in either direction
 
-### 5.5 Likes
+### 5.7 `blacklisted_tokens`
 
-Represents a user's like on a post.
+Exists in the schema with:
 
-Suggested fields:
-
-- `user_id`
-- `post_id`
+- `token`
+- `expiration_time`
 - `created_at`
 
-Rules:
+Project decision:
 
-- A user can like a given post at most once
-
-### 5.6 Retweets
-
-Represents a simple retweet of an existing post.
-
-Suggested fields:
-
-- `user_id`
-- `post_id`
-- `created_at`
-
-Rules:
-
-- A user can retweet a given post at most once
-- Retweets do not store extra text
-
-### 5.7 Sessions
-
-Represents authenticated server-side session state.
-
-Suggested fields depend on the session store, but the API must support:
-
-- login creating a session
-- logout destroying the session
-- protected endpoints requiring a valid session
+- this table is not used in the session-based implementation
+- it will remain unused unless the auth design changes to token-based auth later
 
 ## 6. Authentication and Session Behavior
 
@@ -174,13 +193,16 @@ Suggested fields depend on the session store, but the API must support:
 Users can create an account with:
 
 - `username`
+- `email`
 - `password`
-- optionally `display_name`
+- optionally `name`
 
 Validation requirements:
 
 - username required
 - username unique
+- email required
+- email unique
 - password required
 - password must satisfy basic restrictions
 
@@ -213,11 +235,11 @@ On logout:
 
 After logout:
 
-- protected endpoints should reject access until the user logs in again
+- protected endpoints reject access until the user logs in again
 
 ### 6.4 Protected API Rule
 
-Unless an endpoint is explicitly public, all API endpoints in this project are protected. For this assignment, assume the core application API is authenticated-only.
+For this assignment, assume the core application API is authenticated-only after login.
 
 Unauthenticated requests should generally return:
 
@@ -225,7 +247,7 @@ Unauthenticated requests should generally return:
 
 ## 7. API Resource Requirements
 
-The exact route names may vary slightly during implementation, but the backend should support the following endpoint groups.
+The route names below are recommended because they align with the schema and assignment language.
 
 ### 7.1 Auth
 
@@ -236,37 +258,44 @@ The exact route names may vary slightly during implementation, but the backend s
 
 Expected behavior:
 
-- signup creates account and may optionally log the user in immediately
-- login creates session
-- logout destroys session
+- signup creates an account
+- signup may optionally create a session immediately, but this should be documented if used
+- login creates a session
+- logout destroys the session
 - `GET /auth/me` returns the current authenticated user
 
 ### 7.2 Users and Profiles
 
 - `GET /users/:username`
 - `PATCH /users/me`
-- `GET /users/:username/posts`
+- `GET /users/:username/tweets`
 
 Profile rules:
 
 - authenticated users can view another user's profile unless blocked
-- authenticated users can view another user's posts unless blocked
+- authenticated users can view another user's tweets unless blocked
 - only the current user can update their own profile
-- editable fields: `display_name`, `bio`, `profile_image_url`
-- `username` is not editable in this project version
+- editable fields: `name`, `bio`, `profile_picture`
+- `username` is not editable
+- `email` should remain immutable in the MVP
 
-### 7.3 Posts
+### 7.3 Tweets
 
-- `POST /posts`
-- `GET /posts/:postId`
-- `DELETE /posts/:postId`
-- `GET /posts/:postId/replies`
+- `POST /tweets`
+- `GET /tweets/:tweetId`
+- `DELETE /tweets/:tweetId`
 
 Rules:
 
-- only the author may delete a post
-- deleting a post cascades to dependent likes, retweets, and replies
-- a blocked relationship should prevent reading content where applicable
+- only the author may delete a tweet
+- deleting a tweet should also remove dependent likes and comments
+- deleting an original tweet should also remove retweet rows created from that tweet at the application layer
+- block relationships should prevent reading tweet content where applicable
+
+Implementation note:
+
+- the schema uses `ON DELETE SET NULL` on `tweets.retweeted_from`
+- to preserve clean product behavior, the application should explicitly delete retweet rows before deleting the original tweet
 
 ### 7.4 Feed
 
@@ -281,10 +310,10 @@ Query parameters:
 Feed behavior:
 
 - return reverse-chronological feed items
-- include the authenticated user's own posts
-- include original posts from users the authenticated user follows
+- include the authenticated user's own tweets
+- include original tweets from users the authenticated user follows
 - include retweets made by users the authenticated user follows
-- when a followed user retweets a post, that retweet appears as a separate feed item ordered by the retweet time
+- when a followed user retweets a tweet, that retweet appears as a separate feed item ordered by the retweet time
 - retweeted content may originate from a user the viewer does not follow
 - blocked-user rules must always be enforced
 - refreshing the feed means calling `GET /feed` again
@@ -314,35 +343,36 @@ Rules:
 
 ### 7.7 Likes
 
-- `POST /posts/:postId/like`
-- `DELETE /posts/:postId/like`
+- `POST /tweets/:tweetId/like`
+- `DELETE /tweets/:tweetId/like`
 
 Rules:
 
 - duplicate likes should not be created
 - user cannot like content they are not allowed to access due to blocking
 
-### 7.8 Replies
+### 7.8 Comments
 
-- `POST /posts/:postId/replies`
+- `POST /tweets/:tweetId/comments`
+- `GET /tweets/:tweetId/comments`
 
 Rules:
 
-- replies are stored in the posts table
-- reply row should store `parent_post_id`
-- reply creation should fail if the parent post does not exist
-- reply creation should fail if block rules prevent interaction
+- comment creation should fail if the parent tweet does not exist
+- comment creation should fail if block rules prevent interaction
+- comment listing should respect block visibility rules
 
 ### 7.9 Retweets
 
-- `POST /posts/:postId/retweet`
-- `DELETE /posts/:postId/retweet`
+- `POST /tweets/:tweetId/retweet`
+- `DELETE /tweets/:tweetId/retweet`
 
 Rules:
 
 - duplicate retweets should not be created
-- retweets are separate actions, not edited post copies
+- retweets create tweet rows instead of rows in a separate retweets table
 - retweet creation should fail if block rules prevent interaction
+- unretweet deletes the current user's retweet row for that original tweet
 
 ## 8. Response Shape Requirements
 
@@ -362,7 +392,7 @@ Recommended error pattern:
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Content must be 280 characters or fewer."
+    "message": "Tweet text must be 240 characters or fewer."
   }
 }
 ```
@@ -379,8 +409,8 @@ If user A blocks user B:
 - B cannot see A's content
 - A cannot follow B
 - B cannot follow A
-- A cannot like, reply to, or retweet B's posts
-- B cannot like, reply to, or retweet A's posts
+- A cannot like, comment on, or retweet B's tweets
+- B cannot like, comment on, or retweet A's tweets
 - existing follow relationships between A and B are deleted both directions
 - blocked content should not appear in feed results
 
@@ -388,8 +418,8 @@ If user A blocks user B:
 
 The authenticated timeline includes:
 
-- the user's own original posts
-- original posts from followed users
+- the user's own original tweets
+- original tweets from followed users
 - retweets by followed users
 
 The timeline excludes:
@@ -401,17 +431,17 @@ The timeline excludes:
 Ordering:
 
 - newest first
-- original posts ordered by post creation time
+- original tweets ordered by tweet creation time
 - retweet feed items ordered by retweet creation time
 
 ### 9.3 Deletion Rules
 
-When a post is deleted:
+When a tweet is deleted:
 
 - only the author may perform the deletion
 - dependent likes are deleted
-- dependent retweets are deleted
-- dependent replies are deleted
+- dependent comments are deleted
+- dependent retweet rows should also be deleted by the application
 
 ### 9.4 Duplicate Action Rules
 
@@ -433,17 +463,19 @@ The chosen behavior should be consistent and documented in implementation.
 
 The backend should validate at least the following:
 
-- required fields on signup, login, profile update, and post creation
+- required fields on signup, login, profile update, and tweet creation
 - username uniqueness
+- email uniqueness
 - password restrictions
-- post content length
+- tweet text length
+- comment text length
 - valid numeric pagination values
 - `limit <= 50`
 - referenced user exists
-- referenced post exists
+- referenced tweet exists
 - self-follow not allowed
 - self-block not allowed
-- delete-post only by author
+- delete-tweet only by author
 - protected routes require authentication
 
 ## 11. Error Handling Requirements
@@ -452,12 +484,12 @@ The backend should use standard HTTP status codes.
 
 Recommended usage:
 
-- `200 OK` for successful reads and deletes
+- `200 OK` for successful reads, updates, and deletes
 - `201 Created` for successful creates
 - `400 Bad Request` for malformed input
 - `401 Unauthorized` for missing or invalid session
 - `403 Forbidden` for authenticated but disallowed actions
-- `404 Not Found` for missing users/posts
+- `404 Not Found` for missing users or tweets
 - `409 Conflict` for uniqueness or duplicate-action conflicts
 - `500 Internal Server Error` for unexpected server errors
 
@@ -472,17 +504,17 @@ Tests should cover at least:
 - logout behavior
 - protected-route enforcement
 - profile update behavior
-- create post success and validation failure
-- delete post success and non-author failure
+- create tweet success and validation failure
+- delete tweet success and non-author failure
 - feed ordering and pagination
 - follow and unfollow behavior
 - block and unblock behavior
 - automatic follow removal on block
 - like and unlike behavior
-- reply creation behavior
+- comment creation and listing behavior
 - retweet and unretweet behavior
 - block-rule enforcement across reads and interactions
-- cascade deletion of likes, replies, and retweets after post deletion
+- deletion cleanup for likes, comments, and retweets
 
 Tests should emphasize:
 
@@ -497,9 +529,9 @@ Tests should emphasize:
 The following are intentionally out of scope for this project version:
 
 - quote-retweets
-- post editing
+- tweet editing
 - hashtags, mentions, and search
-- media upload/storage
+- media upload/storage beyond storing an `image_url` string
 - notifications
 - direct messages
 - OAuth or third-party login
@@ -517,11 +549,11 @@ Implementation should proceed incrementally in this order:
 1. Project setup, database connection, session setup, and test infrastructure
 2. Accounts: signup, login, logout, auth guard, current-user endpoint
 3. Profiles: profile read and update
-4. Posts: create, read, delete
+4. Tweets: create, read, delete
 5. Feed: authenticated reverse-chronological feed with pagination
 6. Follows: follow and unfollow
 7. Likes: like and unlike
-8. Replies: create replies and list replies
+8. Comments: create comments and list comments
 9. Retweets: retweet and unretweet, feed integration
 10. Blocks: block, unblock, remove follow edges, enforce visibility and interaction rules everywhere
 11. Final cleanup: validation hardening, error consistency, test coverage, prompt logs, and documentation
@@ -532,9 +564,10 @@ These decisions should later be explained in the architecture document:
 
 - Why Express was chosen for a simple REST backend
 - Why MySQL/MariaDB was chosen to match the provided schema
-- Why server-side sessions were chosen over JWT
-- Why replies use the same posts table instead of a separate comments table
-- Why retweets are simple reposts rather than quote-retweets
+- Why server-side sessions were chosen over JWT even though the schema includes `blacklisted_tokens`
+- Why the implementation follows the provided schema directly
+- Why comments use the separate `comments` table instead of forcing replies into `tweets`
+- Why retweets are represented with `tweets.retweeted_from`
 - Why reverse-chronological feed with limit/offset was chosen over cursor-based pagination
 - Why blocking removes follow relationships in both directions
 - Why username immutability was chosen even though the assignment text mentions profile updates

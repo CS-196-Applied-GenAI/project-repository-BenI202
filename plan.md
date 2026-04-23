@@ -34,24 +34,24 @@ project-repository-BenI202/
     routes/
       authRoutes.js
       userRoutes.js
-      postRoutes.js
+      tweetRoutes.js
       feedRoutes.js
     services/
       authService.js
       userService.js
-      postService.js
+      tweetService.js
       followService.js
       likeService.js
-      replyService.js
+      commentService.js
       retweetService.js
       blockService.js
       feedService.js
     repositories/
       userRepository.js
-      postRepository.js
+      tweetRepository.js
       followRepository.js
       likeRepository.js
-      retweetRepository.js
+      commentRepository.js
       blockRepository.js
     utils/
       validators.js
@@ -63,11 +63,11 @@ project-repository-BenI202/
       auth.js
     auth.test.js
     users.test.js
-    posts.test.js
+    tweets.test.js
     feed.test.js
     follows.test.js
     likes.test.js
-    replies.test.js
+    comments.test.js
     retweets.test.js
     blocks.test.js
   sql/
@@ -93,11 +93,11 @@ A first draft of the project naturally breaks into these major chunks:
 1. setup and infrastructure
 2. authentication
 3. users and profiles
-4. posts
+4. tweets
 5. feed
 6. follows
 7. likes
-8. replies
+8. comments
 9. retweets
 10. blocks
 11. hardening and documentation
@@ -135,15 +135,15 @@ Breaking the coarse milestones into smaller implementation chunks:
 - add profile update endpoint
 - add user-posts listing endpoint
 
-### 4.4 Posts
+### 4.4 Tweets
 
-- add create-post endpoint
-- add read-post endpoint
-- add delete-post endpoint
+- add create-tweet endpoint
+- add read-tweet endpoint
+- add delete-tweet endpoint
 
 ### 4.5 Feed
 
-- add feed query for own posts plus followed users' original posts
+- add feed query for own tweets plus followed users' original tweets
 - add pagination validation
 - add reverse-chronological ordering
 
@@ -153,8 +153,8 @@ Breaking the coarse milestones into smaller implementation chunks:
 - add unfollow
 - add like
 - add unlike
-- add reply
-- add list replies
+- add comment
+- add list comments
 - add retweet
 - add unretweet
 - add retweet feed integration
@@ -381,7 +381,7 @@ Goal:
 
 Implementation:
 - add `PATCH /users/me`
-- allow `display_name`, `bio`, `profile_image_url`
+- allow `name`, `bio`, `profile_picture`
 - reject `username` updates
 
 Tests:
@@ -392,69 +392,69 @@ Tests:
 Done when:
 - editable profile fields work and username remains immutable
 
-### Step 13: Create Post
+### Step 13: Create Tweet
 
 Goal:
-- support original post creation
+- support original tweet creation
 
 Implementation:
-- add `POST /posts`
-- validate content presence and 280-character limit
-- store as non-reply post
+- add `POST /tweets`
+- validate text presence and 240-character limit
+- store as non-retweet tweet
 
 Tests:
-- create post success
+- create tweet success
 - empty content rejected
 - over-limit content rejected
 - unauthenticated create rejected
 
 Done when:
-- authenticated users can publish posts
+- authenticated users can publish tweets
 
-### Step 14: Read Single Post
+### Step 14: Read Single Tweet
 
 Goal:
-- support fetching a single post record
+- support fetching a single tweet record
 
 Implementation:
-- add `GET /posts/:postId`
+- add `GET /tweets/:tweetId`
 - join author summary if useful
 
 Tests:
-- existing post returns `200`
-- missing post returns `404`
+- existing tweet returns `200`
+- missing tweet returns `404`
 
 Done when:
-- single-post reads work independently of feed
+- single-tweet reads work independently of feed
 
-### Step 15: Delete Post
+### Step 15: Delete Tweet
 
 Goal:
 - support author-only deletion
 
 Implementation:
-- add `DELETE /posts/:postId`
+- add `DELETE /tweets/:tweetId`
 - verify ownership before deletion
 
 Tests:
-- author can delete post
+- author can delete tweet
 - non-author gets `403`
-- missing post returns `404`
+- missing tweet returns `404`
 
 Done when:
-- post ownership enforcement works
+- tweet ownership enforcement works
 
-### Step 16: List a User's Posts
+### Step 16: List a User's Tweets
 
 Goal:
-- support `GET /users/:username/posts`
+- support `GET /users/:username/tweets`
 
 Implementation:
-- add reverse-chronological listing for one user's posts
+- add reverse-chronological listing for one user's tweets
 - add `limit` and `offset` handling
 
 Tests:
-- posts are newest first
+- tweets are newest first
 - pagination works
 - missing user returns `404`
 
@@ -502,43 +502,43 @@ Goal:
 
 Implementation:
 - add `GET /feed`
-- include own posts plus original posts from followed users
+- include own tweets plus original tweets from followed users
 - support `limit`, `offset`, default `20`, max `50`
 
 Tests:
-- own posts appear
-- followed users' posts appear
-- unfollowed users' posts do not appear
+- own tweets appear
+- followed users' tweets appear
+- unfollowed users' tweets do not appear
 - ordering is newest first
 - pagination is enforced
 
 Done when:
 - a useful baseline feed exists before retweets and blocks complicate the query
 
-### Step 20: Like a Post
+### Step 20: Like a Tweet
 
 Goal:
 - support likes
 
 Implementation:
-- add `POST /posts/:postId/like`
-- enforce one like per user per post
+- add `POST /tweets/:tweetId/like`
+- enforce one like per user per tweet
 
 Tests:
 - like success
 - duplicate like handled consistently
-- missing post returns `404`
+- missing tweet returns `404`
 
 Done when:
 - interaction table pattern is established
 
-### Step 21: Unlike a Post
+### Step 21: Unlike a Tweet
 
 Goal:
 - remove likes
 
 Implementation:
-- add `DELETE /posts/:postId/like`
+- add `DELETE /tweets/:tweetId/like`
 
 Tests:
 - unlike success
@@ -547,37 +547,37 @@ Tests:
 Done when:
 - like lifecycle is complete
 
-### Step 22: Reply to a Post
+### Step 22: Comment on a Tweet
 
 Goal:
-- support replies using the posts table
+- support comments using the `comments` table
 
 Implementation:
-- add `POST /posts/:postId/replies`
-- store reply with `parent_post_id`
+- add `POST /tweets/:tweetId/comments`
+- create a row in `comments` with `tweet_id`
 
 Tests:
-- reply success
-- missing parent post returns `404`
-- over-limit reply rejected
+- comment success
+- missing parent tweet returns `404`
+- over-limit comment rejected
 
 Done when:
-- posts table supports both original posts and threaded replies
+- comments are persisted independently from tweets
 
-### Step 23: List Replies for a Post
+### Step 23: List Comments for a Tweet
 
 Goal:
-- expose the replies under a parent post
+- expose the comments under a parent tweet
 
 Implementation:
-- add `GET /posts/:postId/replies`
+- add `GET /tweets/:tweetId/comments`
 
 Tests:
-- replies returned in expected order
-- missing parent post handled consistently
+- comments returned in expected order
+- missing parent tweet handled consistently
 
 Done when:
-- reply creation can be validated through an API read path
+- comment creation can be validated through an API read path
 
 ### Step 24: Retweet a Post
 
@@ -585,16 +585,16 @@ Goal:
 - support simple repost behavior
 
 Implementation:
-- add `POST /posts/:postId/retweet`
-- enforce one retweet per user per post
+- add `POST /tweets/:tweetId/retweet`
+- create a tweet row with `retweeted_from`
 
 Tests:
 - retweet success
 - duplicate retweet handled consistently
-- missing post returns `404`
+- missing tweet returns `404`
 
 Done when:
-- retweet interaction is stored independently from posts
+- retweet behavior is stored using the `tweets` table as defined by the schema
 
 ### Step 25: Unretweet a Post
 
@@ -602,7 +602,7 @@ Goal:
 - remove retweets
 
 Implementation:
-- add `DELETE /posts/:postId/retweet`
+- add `DELETE /tweets/:tweetId/retweet`
 
 Tests:
 - unretweet success
@@ -619,7 +619,7 @@ Goal:
 Implementation:
 - merge original posts and retweet items into one reverse-chronological feed
 - order retweet items by retweet creation time
-- include enough metadata for the client to distinguish post vs retweet item
+- include enough metadata for the client to distinguish original tweet vs retweet item
 
 Tests:
 - followed user's retweet appears even if original author is not followed
@@ -665,17 +665,17 @@ Done when:
 ### Step 29: Enforce Block Rules on Profile and Post Reads
 
 Goal:
-- prevent blocked users from reading each other's profile and post data
+- prevent blocked users from reading each other's profile and tweet data
 
 Implementation:
 - add block checks to `GET /users/:username`
-- add block checks to `GET /users/:username/posts`
-- add block checks to `GET /posts/:postId`
-- add block checks to `GET /posts/:postId/replies`
+- add block checks to `GET /users/:username/tweets`
+- add block checks to `GET /tweets/:tweetId`
+- add block checks to `GET /tweets/:tweetId/comments`
 
 Tests:
-- blocker cannot view blocked user's profile or posts
-- blocked user cannot view blocker's profile or posts
+- blocker cannot view blocked user's profile or tweets
+- blocked user cannot view blocker's profile or tweets
 
 Done when:
 - read visibility matches the spec
@@ -683,18 +683,18 @@ Done when:
 ### Step 30: Enforce Block Rules on Interactions
 
 Goal:
-- prevent blocked users from following, liking, replying, and retweeting across block boundaries
+- prevent blocked users from following, liking, commenting, and retweeting across block boundaries
 
 Implementation:
 - add block checks to follow
 - add block checks to like/unlike where relevant
-- add block checks to reply
+- add block checks to comment
 - add block checks to retweet/unretweet where relevant
 
 Tests:
 - blocked relationships prevent follow
 - blocked relationships prevent like
-- blocked relationships prevent reply
+- blocked relationships prevent comment
 - blocked relationships prevent retweet
 
 Done when:
@@ -729,12 +729,12 @@ Implementation:
 - make the chosen approach visible in tests
 
 Tests:
-- deleting a post removes its likes
-- deleting a post removes its retweets
-- deleting a post removes its replies
+- deleting a tweet removes its likes
+- deleting a tweet removes its retweets
+- deleting a tweet removes its comments
 
 Done when:
-- post deletion leaves no dangling relational data
+- tweet deletion leaves no dangling relational data
 
 ### Step 33: Validation and Error Pass
 
@@ -794,8 +794,8 @@ Recommended log buckets:
 
 1. setup and project structure prompts
 2. auth and session prompts
-3. post and feed query prompts
-4. interaction feature prompts for follows, likes, replies, retweets
+3. tweet and feed query prompts
+4. interaction feature prompts for follows, likes, comments, retweets
 5. blocking-rule and edge-case prompts
 6. testing and coverage prompts
 7. architecture tradeoff prompts
