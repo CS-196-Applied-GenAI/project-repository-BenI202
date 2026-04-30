@@ -42,13 +42,19 @@ function getSessionConfig() {
   };
 }
 
+function getFrontendOrigin() {
+  return readString(process.env.FRONTEND_ORIGIN, "http://localhost:3001");
+}
+
 module.exports = {
   env: {
     nodeEnv: getNodeEnv(),
     port: parseNumber(process.env.PORT, 3000),
     database: getDatabaseConfig(),
-    session: getSessionConfig()
+    session: getSessionConfig(),
+    frontendOrigin: getFrontendOrigin()
   },
   getDatabaseConfig,
+  getFrontendOrigin,
   getNodeEnv
 };
