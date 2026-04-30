@@ -1,5 +1,7 @@
+const cors = require("cors");
 const express = require("express");
 
+const { env } = require("./config/env");
 const { sessionMiddleware } = require("./config/session");
 const authRoutes = require("./routes/authRoutes");
 const feedRoutes = require("./routes/feedRoutes");
@@ -11,6 +13,12 @@ const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
+app.use(
+  cors({
+    origin: env.frontendOrigin,
+    credentials: true
+  })
+);
 app.use(express.json());
 app.use(sessionMiddleware);
 

@@ -1,0 +1,9 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/(auth)/login/page": "/login",
+  "/(auth)/signup/page": "/signup",
+  "/(protected)/profile/edit/page": "/profile/edit",
+  "/(protected)/tweets/[tweetId]/page": "/tweets/[tweetId]",
+  "/(protected)/page": "/",
+  "/(protected)/users/[username]/page": "/users/[username]"
+}
