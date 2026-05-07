@@ -7,6 +7,7 @@ import { useAuth } from "../contexts/auth-context";
 
 const links = [
   { href: "/", label: "Feed" },
+  { href: "/tweets/new", label: "Post" },
   { href: "/profile/edit", label: "Edit Profile" }
 ];
 

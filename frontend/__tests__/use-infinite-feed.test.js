@@ -45,4 +45,26 @@ describe("useInfiniteFeed", () => {
 
     await waitFor(() => expect(result.current.error).toBe("Feed failed"));
   });
+
+  test("does not append duplicate ids when the same page is loaded twice", async () => {
+    api.getFeed
+      .mockResolvedValueOnce({
+        items: [{ id: 3 }, { id: 4 }]
+      })
+      .mockResolvedValueOnce({
+        items: [{ id: 3 }, { id: 4 }]
+      });
+
+    const { result } = renderHook(() => useInfiniteFeed());
+
+    await act(async () => {
+      await result.current.loadMore();
+    });
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(result.current.items).toEqual([{ id: 3 }, { id: 4 }]);
+  });
 });

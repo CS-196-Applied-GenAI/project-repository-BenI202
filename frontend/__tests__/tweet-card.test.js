@@ -12,6 +12,8 @@ describe("TweetCard", () => {
   const tweet = {
     id: 1,
     text: "hello world",
+    viewerHasLiked: false,
+    viewerHasRetweeted: false,
     author: {
       id: 2,
       username: "alice",
@@ -29,13 +31,16 @@ describe("TweetCard", () => {
   test("calls like and delete handlers", async () => {
     const onLike = jest.fn().mockResolvedValue(undefined);
     const onDelete = jest.fn();
+    const onRetweet = jest.fn().mockResolvedValue(undefined);
 
-    render(<TweetCard canDelete onDelete={onDelete} onLike={onLike} tweet={tweet} />);
+    render(<TweetCard canDelete onDelete={onDelete} onLike={onLike} onRetweet={onRetweet} tweet={tweet} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Like" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retweet" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     expect(onLike).toHaveBeenCalledWith(tweet, true);
+    expect(onRetweet).toHaveBeenCalledWith(tweet, true);
     expect(onDelete).toHaveBeenCalledWith(tweet);
   });
 });

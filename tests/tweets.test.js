@@ -30,6 +30,13 @@ jest.mock("../src/repositories/likeRepository", () => ({
   deleteLike: jest.fn()
 }));
 
+jest.mock("../src/repositories/followRepository", () => ({
+  existsFollow: jest.fn(),
+  createFollow: jest.fn(),
+  deleteFollow: jest.fn(),
+  deleteFollowRelationshipsBetweenUsers: jest.fn()
+}));
+
 jest.mock("../src/repositories/commentRepository", () => ({
   createComment: jest.fn(),
   findCommentById: jest.fn(),
@@ -153,6 +160,8 @@ describe("tweet routes", () => {
       }
     });
     blockRepository.usersAreBlocked.mockResolvedValue(false);
+    likeRepository.existsLike.mockResolvedValue(false);
+    tweetRepository.findRetweetByUserAndOriginalTweet.mockResolvedValue(null);
 
     const response = await agent.get("/tweets/3");
 

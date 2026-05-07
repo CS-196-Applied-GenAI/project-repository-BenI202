@@ -82,6 +82,18 @@ export function unlikeTweet(tweetId) {
   });
 }
 
+export function retweetTweet(tweetId) {
+  return request(`/tweets/${tweetId}/retweet`, {
+    method: "POST"
+  });
+}
+
+export function unretweetTweet(tweetId) {
+  return request(`/tweets/${tweetId}/retweet`, {
+    method: "DELETE"
+  });
+}
+
 export function getTweetComments(tweetId) {
   return request(`/tweets/${tweetId}/comments`);
 }
@@ -109,6 +121,22 @@ export function followUser(username) {
 
 export function unfollowUser(username) {
   return request(`/users/${username}/follow`, {
+    method: "DELETE"
+  });
+}
+
+export function getSuggestedUsers({ limit = 5 } = {}) {
+  return request(`/users/suggestions?limit=${limit}`);
+}
+
+export function blockUser(username) {
+  return request(`/users/${username}/block`, {
+    method: "POST"
+  });
+}
+
+export function unblockUser(username) {
+  return request(`/users/${username}/block`, {
     method: "DELETE"
   });
 }

@@ -92,10 +92,37 @@ async function updateUserProfile(userId, updates) {
   return findUserById(userId);
 }
 
+async function listSuggestedUsers(viewerId, limit) {
+  const pool = getDbPool();
+  const [rows] = await pool.query(
+    `SELECT u.id, u.username, u.email, u.name, u.bio, u.profile_picture, u.password_hash, u.created_at
+     FROM users u
+     WHERE u.id <> ?
+       AND NOT EXISTS (
+         SELECT 1
+         FROM follows f
+         WHERE f.follower_id = ?
+           AND f.followee_id = u.id
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM blocks b
+         WHERE (b.blocker_id = ? AND b.blocked_id = u.id)
+            OR (b.blocker_id = u.id AND b.blocked_id = ?)
+       )
+     ORDER BY RAND()
+     LIMIT ?`,
+    [viewerId, viewerId, viewerId, viewerId, limit]
+  );
+
+  return rows.map(mapUserRow);
+}
+
 module.exports = {
   findUserByUsername,
   findUserByEmail,
   findUserById,
   createUser,
-  updateUserProfile
+  updateUserProfile,
+  listSuggestedUsers
 };

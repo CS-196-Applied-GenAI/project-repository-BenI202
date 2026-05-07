@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
 import EmptyState from "../../../../components/empty-state";
@@ -40,6 +41,22 @@ export default function TweetDetailPage({ params }) {
     loadTweetDetail();
   }, [tweetId]);
 
+  async function handleRetweet(targetTweet, shouldRetweet) {
+    setError("");
+
+    try {
+      if (shouldRetweet) {
+        await api.retweetTweet(targetTweet.id);
+      } else {
+        await api.unretweetTweet(targetTweet.id);
+      }
+
+      await loadTweetDetail();
+    } catch (retweetError) {
+      setError(retweetError.message);
+    }
+  }
+
   if (isLoading) {
     return <LoadingState label="Loading tweet" />;
   }
@@ -61,7 +78,23 @@ export default function TweetDetailPage({ params }) {
 
           await loadTweetDetail();
         }}
+        onRetweet={handleRetweet}
       />
+
+      <div className="flex flex-wrap gap-3">
+        <Link
+          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)]"
+          href={`/tweets/${tweet.id}/reply`}
+        >
+          Open reply page
+        </Link>
+        <Link
+          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)]"
+          href={`/tweets/${tweet.id}/replies`}
+        >
+          Open replies page
+        </Link>
+      </div>
 
       <form
         className="rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-5 shadow-[0_20px_60px_rgba(16,32,24,0.06)]"
@@ -109,8 +142,12 @@ export default function TweetDetailPage({ params }) {
               className="rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-5 shadow-[0_18px_50px_rgba(16,32,24,0.06)]"
               key={comment.id}
             >
-              <p className="text-sm font-semibold">{comment.author?.name || comment.author?.username}</p>
-              <p className="text-xs text-[var(--muted)]">@{comment.author?.username}</p>
+              <Link className="text-sm font-semibold" href={`/users/${comment.author?.username}`}>
+                {comment.author?.name || comment.author?.username}
+              </Link>
+              <p className="text-xs text-[var(--muted)]">
+                <Link href={`/users/${comment.author?.username}`}>@{comment.author?.username}</Link>
+              </p>
               <p className="mt-3 text-sm leading-7">{comment.contents}</p>
             </article>
           ))

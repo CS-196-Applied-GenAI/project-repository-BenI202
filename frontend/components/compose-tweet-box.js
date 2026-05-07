@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-export default function ComposeTweetBox({ onSubmit }) {
+export default function ComposeTweetBox({
+  buttonLabel = "Post tweet",
+  onSubmit,
+  placeholder = "What is happening today?",
+  title = "Compose a tweet"
+}) {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,13 +43,13 @@ export default function ComposeTweetBox({ onSubmit }) {
       }}
     >
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Compose a tweet</h2>
+        <h2 className="text-lg font-semibold">{title}</h2>
         <span className={`text-xs font-semibold ${remaining < 0 ? "text-red-600" : "text-[var(--muted)]"}`}>{remaining}</span>
       </div>
       <textarea
         className="mt-4 min-h-32 w-full rounded-[1.5rem] border border-[var(--line)] bg-white px-4 py-4 text-sm leading-6 outline-none transition focus:border-[var(--accent)]"
         onChange={(event) => setText(event.target.value)}
-        placeholder="What is happening today?"
+        placeholder={placeholder}
         value={text}
       />
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
@@ -54,7 +59,7 @@ export default function ComposeTweetBox({ onSubmit }) {
           disabled={isSubmitting}
           type="submit"
         >
-          {isSubmitting ? "Posting..." : "Post tweet"}
+          {isSubmitting ? "Posting..." : buttonLabel}
         </button>
       </div>
     </form>

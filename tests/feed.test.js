@@ -17,9 +17,16 @@ jest.mock("../src/repositories/tweetRepository", () => ({
   listFeedTweets: jest.fn()
 }));
 
+jest.mock("../src/repositories/likeRepository", () => ({
+  existsLike: jest.fn(),
+  createLike: jest.fn(),
+  deleteLike: jest.fn()
+}));
+
 const bcrypt = require("bcryptjs");
 const request = require("supertest");
 
+const likeRepository = require("../src/repositories/likeRepository");
 const tweetRepository = require("../src/repositories/tweetRepository");
 const userRepository = require("../src/repositories/userRepository");
 const app = require("../src/app");
@@ -60,6 +67,8 @@ describe("feed routes", () => {
         text: "latest tweet"
       }
     ]);
+    likeRepository.existsLike.mockResolvedValue(false);
+    tweetRepository.findRetweetByUserAndOriginalTweet.mockResolvedValue(null);
 
     const response = await agent.get("/feed?limit=10&offset=5");
 

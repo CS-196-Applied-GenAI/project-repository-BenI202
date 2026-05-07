@@ -1,6 +1,7 @@
 const tweetRepository = require("../repositories/tweetRepository");
 const { ForbiddenError, NotFoundError, ValidationError } = require("../utils/errors");
 const accessService = require("./accessService");
+const { decorateTweetForViewer } = require("./viewerMetadataService");
 
 function normalizeTweetText(text) {
   if (typeof text !== "string") {
@@ -47,7 +48,7 @@ async function getTweetByIdForViewer(userId, tweetId) {
   const tweet = await getTweetById(tweetId);
   await accessService.assertCanAccessTweet(userId, tweet);
 
-  return tweet;
+  return decorateTweetForViewer(userId, tweet);
 }
 
 async function deleteTweet(userId, tweetId) {

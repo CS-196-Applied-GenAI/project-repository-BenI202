@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import EmptyState from "../../../../components/empty-state";
 import ErrorState from "../../../../components/error-state";
@@ -15,6 +16,7 @@ const PAGE_SIZE = 20;
 export default function UserProfilePage({ params }) {
   const { currentUser } = useAuth();
   const { username } = use(params);
+  const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [tweets, setTweets] = useState([]);
   const [offset, setOffset] = useState(0);
@@ -22,6 +24,19 @@ export default function UserProfilePage({ params }) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [hasMore, setHasMore] = useState(false);
+
+  async function loadProfileData({ append = false, nextOffset = 0 } = {}) {
+    const [profileData, tweetsData] = await Promise.all([
+      api.getUserProfile(username),
+      api.getUserTweets(username, { limit: PAGE_SIZE, offset: nextOffset })
+    ]);
+    const nextTweets = tweetsData.tweets || [];
+
+    setProfile(profileData.user);
+    setTweets((currentTweets) => (append ? [...currentTweets, ...nextTweets] : nextTweets));
+    setOffset(nextOffset + PAGE_SIZE);
+    setHasMore(nextTweets.length === PAGE_SIZE);
+  }
 
   useEffect(() => {
     let ignore = false;
@@ -31,16 +46,8 @@ export default function UserProfilePage({ params }) {
       setError("");
 
       try {
-        const [profileData, tweetsData] = await Promise.all([
-          api.getUserProfile(username),
-          api.getUserTweets(username, { limit: PAGE_SIZE, offset: 0 })
-        ]);
-
         if (!ignore) {
-          setProfile(profileData.user);
-          setTweets(tweetsData.tweets || []);
-          setOffset(PAGE_SIZE);
-          setHasMore((tweetsData.tweets || []).length === PAGE_SIZE);
+          await loadProfileData({ append: false, nextOffset: 0 });
         }
       } catch (profileError) {
         if (!ignore) {
@@ -63,15 +70,61 @@ export default function UserProfilePage({ params }) {
   async function loadMoreTweets() {
     setIsLoadingMore(true);
     try {
-      const data = await api.getUserTweets(username, { limit: PAGE_SIZE, offset });
-      const nextTweets = data.tweets || [];
-      setTweets((currentTweets) => [...currentTweets, ...nextTweets]);
-      setOffset((currentOffset) => currentOffset + PAGE_SIZE);
-      setHasMore(nextTweets.length === PAGE_SIZE);
+      await loadProfileData({ append: true, nextOffset: offset });
     } catch (loadError) {
       setError(loadError.message);
     } finally {
       setIsLoadingMore(false);
+    }
+  }
+
+  async function handleLike(tweet, shouldLike) {
+    setError("");
+    try {
+      if (shouldLike) {
+        await api.likeTweet(tweet.id);
+      } else {
+        await api.unlikeTweet(tweet.id);
+      }
+
+      await loadProfileData({ append: false, nextOffset: 0 });
+    } catch (actionError) {
+      setError(actionError.message);
+    }
+  }
+
+  async function handleRetweet(tweet, shouldRetweet) {
+    setError("");
+    try {
+      if (shouldRetweet) {
+        await api.retweetTweet(tweet.id);
+      } else {
+        await api.unretweetTweet(tweet.id);
+      }
+
+      await loadProfileData({ append: false, nextOffset: 0 });
+    } catch (actionError) {
+      setError(actionError.message);
+    }
+  }
+
+  async function handleDelete(tweet) {
+    setError("");
+    try {
+      await api.deleteTweet(tweet.id);
+      await loadProfileData({ append: false, nextOffset: 0 });
+    } catch (actionError) {
+      setError(actionError.message);
+    }
+  }
+
+  async function handleBlock() {
+    setError("");
+    try {
+      await api.blockUser(profile.username);
+      router.replace("/");
+    } catch (blockError) {
+      setError(blockError.message);
     }
   }
 
@@ -87,9 +140,31 @@ export default function UserProfilePage({ params }) {
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <ProfileHeader
         currentUsername={currentUser?.username}
-        onFollowChange={(shouldFollow) =>
-          shouldFollow ? api.followUser(profile.username) : api.unfollowUser(profile.username)
-        }
+        initiallyBlocked={profile.viewerHasBlocked}
+        onBlock={handleBlock}
+        onFollowChange={async (shouldFollow) => {
+          setError("");
+
+          try {
+            if (shouldFollow) {
+              await api.followUser(profile.username);
+            } else {
+              await api.unfollowUser(profile.username);
+            }
+
+            setProfile((currentProfile) =>
+              currentProfile
+                ? {
+                    ...currentProfile,
+                    viewerIsFollowing: shouldFollow
+                  }
+                : currentProfile
+            );
+          } catch (followError) {
+            setError(followError.message);
+            throw followError;
+          }
+        }}
         profile={profile}
       />
 
@@ -98,7 +173,14 @@ export default function UserProfilePage({ params }) {
       ) : (
         <div className="flex flex-col gap-4">
           {tweets.map((tweet) => (
-            <TweetCard key={tweet.id} tweet={tweet} />
+            <TweetCard
+              key={tweet.id}
+              tweet={tweet}
+              canDelete={tweet.author?.id === currentUser?.id}
+              onDelete={handleDelete}
+              onLike={handleLike}
+              onRetweet={handleRetweet}
+            />
           ))}
         </div>
       )}

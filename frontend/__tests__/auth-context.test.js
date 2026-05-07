@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 
-import { AuthProvider, useAuth } from "../contexts/auth-context";
+import { AuthProvider, INACTIVITY_TIMEOUT_MS, useAuth } from "../contexts/auth-context";
 import * as api from "../lib/api";
 
 jest.mock("../lib/api");
@@ -78,5 +78,32 @@ describe("AuthProvider", () => {
     });
 
     expect(screen.getByText("unauthenticated")).toBeInTheDocument();
+  });
+
+  test("expires the session after inactivity", async () => {
+    jest.useFakeTimers();
+    api.getCurrentUser.mockResolvedValue({
+      user: {
+        username: "alice"
+      }
+    });
+    api.logout.mockResolvedValue({
+      message: "ok"
+    });
+
+    render(
+      <AuthProvider>
+        <Consumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.getByText("authenticated")).toBeInTheDocument());
+
+    await act(async () => {
+      jest.advanceTimersByTime(INACTIVITY_TIMEOUT_MS + 1);
+    });
+
+    await waitFor(() => expect(screen.getByText("unauthenticated")).toBeInTheDocument());
+    jest.useRealTimers();
   });
 });

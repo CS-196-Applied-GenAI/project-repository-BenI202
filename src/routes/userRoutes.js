@@ -19,6 +19,15 @@ router.patch("/me", async (req, res, next) => {
   }
 });
 
+router.get("/suggestions", async (req, res, next) => {
+  try {
+    const result = await userService.getSuggestedUsers(req.session.userId, req.query);
+    sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/:username/follow", async (req, res, next) => {
   try {
     const user = await followService.followUser(req.session.userId, req.params.username);

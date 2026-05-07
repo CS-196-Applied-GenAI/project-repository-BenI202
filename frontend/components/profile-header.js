@@ -4,7 +4,13 @@ import Link from "next/link";
 
 import FollowButton from "./follow-button";
 
-export default function ProfileHeader({ currentUsername, onFollowChange, profile }) {
+export default function ProfileHeader({
+  currentUsername,
+  initiallyBlocked = false,
+  onBlock,
+  onFollowChange,
+  profile
+}) {
   const isCurrentUser = currentUsername === profile.username;
 
   return (
@@ -26,7 +32,17 @@ export default function ProfileHeader({ currentUsername, onFollowChange, profile
               Edit profile
             </Link>
           ) : (
-            <FollowButton onFollowChange={onFollowChange} />
+            <>
+              <FollowButton initiallyFollowing={profile.viewerIsFollowing} onFollowChange={onFollowChange} />
+              <button
+                className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--sage)]"
+                disabled={initiallyBlocked}
+                onClick={() => onBlock?.()}
+                type="button"
+              >
+                {initiallyBlocked ? "Blocked" : "Block"}
+              </button>
+            </>
           )}
         </div>
       </div>

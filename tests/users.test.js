@@ -3,7 +3,8 @@ jest.mock("../src/repositories/userRepository", () => ({
   findUserByEmail: jest.fn(),
   findUserById: jest.fn(),
   createUser: jest.fn(),
-  updateUserProfile: jest.fn()
+  updateUserProfile: jest.fn(),
+  listSuggestedUsers: jest.fn()
 }));
 
 jest.mock("../src/repositories/tweetRepository", () => ({
@@ -24,10 +25,25 @@ jest.mock("../src/repositories/blockRepository", () => ({
   deleteBlock: jest.fn()
 }));
 
+jest.mock("../src/repositories/followRepository", () => ({
+  existsFollow: jest.fn(),
+  createFollow: jest.fn(),
+  deleteFollow: jest.fn(),
+  deleteFollowRelationshipsBetweenUsers: jest.fn()
+}));
+
+jest.mock("../src/repositories/likeRepository", () => ({
+  existsLike: jest.fn(),
+  createLike: jest.fn(),
+  deleteLike: jest.fn()
+}));
+
 const bcrypt = require("bcryptjs");
 const request = require("supertest");
 
 const blockRepository = require("../src/repositories/blockRepository");
+const followRepository = require("../src/repositories/followRepository");
+const likeRepository = require("../src/repositories/likeRepository");
 const tweetRepository = require("../src/repositories/tweetRepository");
 const userRepository = require("../src/repositories/userRepository");
 const app = require("../src/app");
@@ -64,6 +80,7 @@ describe("user routes", () => {
       createdAt: "2026-04-23T00:00:00.000Z"
     });
     blockRepository.usersAreBlocked.mockResolvedValue(false);
+    followRepository.existsFollow.mockResolvedValue(false);
 
     userRepository.findUserByUsername.mockResolvedValueOnce({
       id: 11,
@@ -153,6 +170,7 @@ describe("user routes", () => {
       createdAt: "2026-04-23T00:00:00.000Z"
     });
     blockRepository.usersAreBlocked.mockResolvedValue(false);
+    followRepository.existsFollow.mockResolvedValue(false);
 
     userRepository.findUserByUsername.mockResolvedValueOnce({
       id: 15,
@@ -169,6 +187,8 @@ describe("user routes", () => {
         text: "hello world"
       }
     ]);
+    likeRepository.existsLike.mockResolvedValue(false);
+    tweetRepository.findRetweetByUserAndOriginalTweet.mockResolvedValue(null);
 
     const response = await agent.get("/users/alice/tweets?limit=10&offset=5");
 
@@ -208,5 +228,39 @@ describe("user routes", () => {
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN");
+  });
+
+  test("returns suggested users", async () => {
+    const agent = request.agent(app);
+
+    await loginAgent(agent, {
+      id: 18,
+      username: "viewer",
+      email: "viewer@example.com",
+      name: "Viewer",
+      bio: null,
+      profilePicture: null,
+      createdAt: "2026-04-23T00:00:00.000Z"
+    });
+
+    userRepository.listSuggestedUsers.mockResolvedValue([
+      {
+        id: 19,
+        username: "alice",
+        email: "alice@example.com",
+        name: "Alice",
+        bio: "hello",
+        profilePicture: null,
+        createdAt: "2026-04-23T00:00:00.000Z"
+      }
+    ]);
+    followRepository.existsFollow.mockResolvedValue(false);
+    blockRepository.existsBlock.mockResolvedValue(false);
+
+    const response = await agent.get("/users/suggestions?limit=3");
+
+    expect(response.status).toBe(200);
+    expect(userRepository.listSuggestedUsers).toHaveBeenCalledWith(18, 3);
+    expect(response.body.data.users[0].username).toBe("alice");
   });
 });
